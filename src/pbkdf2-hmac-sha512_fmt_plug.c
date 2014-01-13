@@ -32,7 +32,7 @@
 #define FORMAT_TAG              "$pbkdf2-hmac-sha512$"
 #define FORMAT_TAG2             "$ml$"
 #define FORMAT_TAG3             "grub.pbkdf2.sha512."
-#define FORMAT_NAME             "GRUB2 / OS X 10.8"
+#define FORMAT_NAME             "GRUB2 / OS X 10.8+"
 
 #ifdef MMX_COEF_SHA512
 #define ALGORITHM_NAME		"PBKDF2-SHA512 " SHA512_ALGORITHM_NAME
@@ -133,7 +133,10 @@ static int valid(char *ciphertext, struct fmt_main *self)
 	keeptr = ctcopy;
 	if (!(ptr = strtok(ctcopy, ".")))
 		goto error;
-	if (!atoi(ptr))
+	if (strlen(ptr) >= 10)
+		goto error;
+	len = atoi(ptr);
+	if (len >= UINT_MAX) // FIXME: atoi() undefined behavior
 		goto error;
 	if (!(ptr = strtok(NULL, ".")))
 		goto error;

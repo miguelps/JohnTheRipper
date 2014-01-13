@@ -37,6 +37,8 @@
 #include <libgen.h>
 #include <ctype.h>
 
+#include "misc.h"
+
 #define public extern
 #define private static
 
@@ -48,18 +50,21 @@ typedef unsigned char byte;
 
 #define NULL_VER -1
 
+#define BIG_ENOUGH 8192
+
 /* Global Stuff */
 
-static unsigned char d[4096];
-static unsigned char u[4096];
-static unsigned char p[4096];
-static unsigned char q[4096];
-static unsigned char g[4096];
-static unsigned char y[4096];
-static unsigned char n[4096];
-// static unsigned char x[4096];
-static unsigned char m_data[4096];
-static unsigned char gecos[4096];
+static unsigned char d[BIG_ENOUGH];
+static unsigned char u[BIG_ENOUGH];
+static unsigned char p[BIG_ENOUGH];
+static unsigned char q[BIG_ENOUGH];
+static unsigned char g[BIG_ENOUGH];
+static unsigned char y[BIG_ENOUGH];
+static unsigned char n[BIG_ENOUGH];
+static unsigned char e[BIG_ENOUGH];
+// static unsigned char x[BIG_ENOUGH];
+static unsigned char m_data[BIG_ENOUGH];
+static char gecos[BIG_ENOUGH];
 static unsigned char m_salt[64];
 static unsigned char iv[16];
 char *filename;
@@ -75,6 +80,7 @@ int g_bits;
 int y_bits;
 int n_bits;
 int u_bits;
+int e_bits;
 int m_datalen;
 int m_usage, m_hashAlgorithm, m_cipherAlgorithm, bs;
 int m_count;
@@ -304,6 +310,7 @@ give_pdump(int len)
 	int i;
 	for (i = 0; i < len; i++)
 		gecos[i] = Getc();
+	gecos[i] = 0;
 }
 
 public void
@@ -1427,42 +1434,43 @@ signature_expiration_time(int len)
 public void
 exportable_certification(int len)
 {
-	printf("\t\tExportable - ");
-	if (Getc() == 0)
-		printf("No");
-	else
-		printf("Yes");
-	printf("\n");
+	// printf("\t\tExportable - ");
+	if (Getc() == 0);
+		// printf("No");
+	else;
+		// printf("Yes");
+	// printf("\n");
 }
 
 public void
 trust_signature(int len)
 {
-	printf("\t\tLevel - ");
-	dump(1);
-	printf("\n");
-	printf("\t\tAmount - ");
-	dump(1);
-	printf("\n");
+	// printf("\t\tLevel - ");
+	skip(1);
+	// printf("\n");
+	// printf("\t\tAmount - ");
+	skip(1);
+	// printf("\n");
 }
 
 public void
 regular_expression(int len)
 {
-	printf("\t\tRegex - ");
-	pdump(len);
-	printf("\n");
+	// printf("\t\tRegex - ");
+	// pdump(len);
+	skip(len);
+	// printf("\n");
 }
 
 public void
 revocable(int len)
 {
-	printf("\t\tRevocable - ");
-	if (Getc() == 0)
-		printf("No");
-	else
-		printf("Yes");
-	printf("\n");
+	// printf("\t\tRevocable - ");
+	if (Getc() == 0);
+		// printf("No");
+	else;
+		// printf("Yes");
+	// printf("\n");
 }
 
 public void
@@ -1636,10 +1644,10 @@ public void
 primary_user_id(int len)
 {
 	// printf("\t\tPrimary - ");
-	if (Getc() == 0)
-		printf("No");
-	else
-		printf("Yes");
+	if (Getc() == 0);
+		// printf("No");
+	else;
+		// printf("Yes");
 	// printf("\n");
 }
 
@@ -1783,7 +1791,7 @@ signature_multi_precision_integer(int pub, int len)
 		// printf("\t\t-> hash(DSA q bits)\n");
 		break;
 	default:
-		printf("\tUnknown signature(pub %d)\n", pub);
+		// printf("\tUnknown signature(pub %d)\n", pub);
 		skip(len);
 		break;
 	}
@@ -1975,8 +1983,10 @@ old_Public_Key_Packet(void)
 	// printf("\tValid days - %d[0 is forever]\n", days);
 	PUBLIC = Getc();
 	pub_algs(PUBLIC); /* PUBLIC should be 1 */
-	skip_multi_precision_integer("RSA n");
-	skip_multi_precision_integer("RSA e");
+	// skip_multi_precision_integer("RSA n");
+	// skip_multi_precision_integer("RSA e");
+	give_multi_precision_integer(n, &n_bits);
+	give_multi_precision_integer(e, &e_bits);
 }
 
 private void
@@ -1992,7 +2002,7 @@ new_Public_Key_Packet(int len)
 	case 2:
 	case 3:
 		give_multi_precision_integer(n, &n_bits);  // RSA n
-		skip_multi_precision_integer("RSA e");
+		give_multi_precision_integer(e, &e_bits);  // RSA e
 		break;
 	case 16:
 	case 20:
@@ -2063,17 +2073,30 @@ Secret_Key_Packet(int len)
 		break;
 	default:
 		sym = s2k;
+		m_usage = s2k;
 		sym_algs(sym);
-		printf("\tSimple string-to-key for IDEA\n");
+		// printf("\tSimple string-to-key for IDEA\n"); // XXX
 		IV(iv_len(sym));
 		encrypted_Secret_Key(len - Getc_getlen(), NO);
 		break;
 	}
 }
 
+static void print_hex(unsigned char *str, int len)
+{
+	int i;
+	for (i = 0; i < len; ++i)
+		printf("%02x", str[i]);
+}
+
 private void
 plain_Secret_Key(int len)
 {
+	static char path[8192];
+	char *base;
+	strncpy(path, filename, sizeof(path));
+	base = basename(path);
+
 	switch (VERSION) {
 	case 2:
 	case 3:
@@ -2083,7 +2106,12 @@ plain_Secret_Key(int len)
 		// multi_precision_integer("RSA p");
 		// multi_precision_integer("RSA q");
 		// multi_precision_integer("RSA u");
-		printf("\tChecksum - ");
+		give_multi_precision_integer(d, &d_bits);
+		give_multi_precision_integer(p, &p_bits);
+		give_multi_precision_integer(q, &q_bits);
+		give_multi_precision_integer(u, &u_bits);
+		fprintf(stderr, "%s contains plain RSA secret key packet!\n", base);
+		// printf("\tChecksum - ");
 		skip(2);
 		// dump(2);
 		// printf("\n");
@@ -2097,13 +2125,20 @@ plain_Secret_Key(int len)
 			// multi_precision_integer("RSA p");
 			// multi_precision_integer("RSA q");
 			// multi_precision_integer("RSA u");
+			give_multi_precision_integer(d, &d_bits);
+			give_multi_precision_integer(p, &p_bits);
+			give_multi_precision_integer(q, &q_bits);
+			give_multi_precision_integer(u, &u_bits);
+			fprintf(stderr, "%s contains plain RSA secret key packet!\n", base);
 			break;
 		case 16:
 		case 20:
 			skip_multi_precision_integer("ElGamal x");
+			fprintf(stderr, "%s contains plain ElGamal secret key packet!\n", base);
 			break;
 		case 17:
 			skip_multi_precision_integer("DSA x");
+			fprintf(stderr, "%s contains plain DSA secret key packet!\n", base);
 			break;
 		default:
 			printf("\tUnknown secret key(pub %d)\n", PUBLIC);
@@ -2122,30 +2157,63 @@ plain_Secret_Key(int len)
 	}
 }
 
-static void print_hex(unsigned char *str, int len)
-{
-	int i;
-	for (i = 0; i < len; ++i)
-		printf("%02x", str[i]);
-}
-
 private void
 encrypted_Secret_Key(int len, int sha1)
 {
 	int used = 0;
-	static char path[8192];
-	char *base;
-	strncpy(path, filename, sizeof(path));
-	base = basename(path);
+	char *cp;
+	char login[4096];
+	char *gecos_remains = gecos;
+	const char *ext[] = {".gpg", ".pgp"};
+
+	/* Use base of filename as login as last resort */
+	/* /path/johndoe.gpg -> johndoe */
+	if (!gecos[0]) {
+		cp = strip_suffixes(jtr_basename(filename), ext, 2);
+		strncpy(gecos, cp, sizeof(gecos));
+	}
+
+	/* login field is Real Name part of user data */
+	strncpy(login, gecos, sizeof(login));
+
+	if ((cp = strchr(login, '(')))
+		memset(cp, 0, 1);
+	if ((cp = strrchr(login, '<')))
+		memset(cp, 0, 1);
+
+	/* gecos field is the rest of user data (comment, email) */
+	gecos_remains += strlen(login);
+
+	/* Ditch trailing spaces in login */
+	cp = &login[strlen(login) - 1];
+	while (cp > login && *cp == ' ')
+		*cp-- = 0;
+
+	// printf("Version is %d\n", VERSION);
 	switch (VERSION) {
 	case 2:
 	case 3:
 		/* PUBLIC should be 1.
 		   Printable since an MPI prefix count is not encrypted. */
-		give_multi_precision_integer(d, &d_bits);
-		give_multi_precision_integer(p, &p_bits);
-		give_multi_precision_integer(q, &p_bits);
-		give_multi_precision_integer(u, &u_bits);
+		// give_multi_precision_integer(d, &d_bits);
+		// give_multi_precision_integer(p, &p_bits);
+		// give_multi_precision_integer(q, &p_bits);
+		// give_multi_precision_integer(u, &u_bits);
+		give(len, m_data); // we can't break down the "data" further into fields
+		used += len;
+
+		m_algorithm = PUBLIC;
+		printf("%s:$gpg$*%d*%d*%d*", login, m_algorithm, len, n_bits);
+		print_hex(m_data, len);
+		printf("*%d*%d*%d*%d*%d*", m_spec, m_usage, m_hashAlgorithm, m_cipherAlgorithm, bs);
+		print_hex(iv, bs);
+		printf("*%d*", m_count);
+		print_hex(m_salt, 8);
+		if (m_usage == 1) { /* handle 2 byte checksum */
+			printf("*%d*", (n_bits + 7) / 8);
+			print_hex(n, (n_bits + 7) / 8);
+		}
+		printf(":::%s::%s\n", gecos, filename);
 		break;
 	case 4:
 		switch (PUBLIC) {
@@ -2156,20 +2224,25 @@ encrypted_Secret_Key(int len, int sha1)
 			give(len, m_data); // we can't break down the "data" further into fields
 			used += len;
 			m_algorithm = PUBLIC;  // Encrypted RSA
-			printf("%s:$gpg$*%d*%d*%d*", base, m_algorithm, len, n_bits);
+			printf("%s:$gpg$*%d*%d*%d*", login, m_algorithm, len, n_bits);
 			print_hex(m_data, len);
 			printf("*%d*%d*%d*%d*%d*", m_spec, m_usage, m_hashAlgorithm, m_cipherAlgorithm, bs);
 			print_hex(iv, bs);
 			printf("*%d*", m_count);
 			print_hex(m_salt, 8);
-			printf(":::%s::%s\n",gecos, base);
+			if (m_usage == 255) { /* handle 2 byte checksum */
+				// gpg --homedir . --s2k-mode 0 --simple-sk-checksum --s2k-cipher-algo IDEA --gen-key
+				printf("*%d*", (n_bits + 7) / 8);
+				print_hex(n, (n_bits + 7) / 8);
+			}
+			printf(":::%s::%s\n",gecos_remains, filename);
 			break;
 		case 16:
 		case 20:
 			m_algorithm = PUBLIC;  // Encrypted ElGamal
 			give(len, m_data);
 			used += len;
-			printf("%s:$gpg$*%d*%d*%d*", base, m_algorithm, len, key_bits);
+			printf("%s:$gpg$*%d*%d*%d*", login, m_algorithm, len, key_bits);
 			print_hex(m_data, len);
 			printf("*%d*%d*%d*%d*%d*", m_spec, m_usage, m_hashAlgorithm, m_cipherAlgorithm, bs);
 			print_hex(iv, bs);
@@ -2183,13 +2256,13 @@ encrypted_Secret_Key(int len, int sha1)
 				printf("*%d*", (y_bits + 7) / 8);
 				print_hex(y, (y_bits + 7) / 8);
 			}
-			printf(":::%s::%s\n",gecos, base);
+			printf(":::%s::%s\n",gecos_remains, filename);
 			break;
 		case 17:
 			m_algorithm = PUBLIC;  // Encrypted DSA
 			give(len, m_data);
 			used += len;
-			printf("%s:$gpg$*%d*%d*%d*", base, m_algorithm, len, key_bits);
+			printf("%s:$gpg$*%d*%d*%d*", login, m_algorithm, len, key_bits);
 			print_hex(m_data, len);
 			printf("*%d*%d*%d*%d*%d*", m_spec, m_usage, m_hashAlgorithm, m_cipherAlgorithm, bs);
 			print_hex(iv, bs);
@@ -2205,7 +2278,7 @@ encrypted_Secret_Key(int len, int sha1)
 				printf("*%d*", (y_bits + 7) / 8);
 				print_hex(y, (y_bits + 7) / 8);
 			}
-			printf(":::%s::%s\n",gecos, base);
+			printf(":::%s::%s\n",gecos_remains, filename);
 			break;
 		default:
 			printf("\tUnknown encrypted key(pub %d)\n", PUBLIC);

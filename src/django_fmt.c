@@ -103,6 +103,7 @@ static void init(struct fmt_main *self)
 static int valid(char *ciphertext, struct fmt_main *self)
 {
 	char *ctcopy, *keeptr, *p;
+	int iterations;
 	if (strncmp(ciphertext, "$django$*", 9) != 0)
 		return 0;
 	ctcopy = strdup(ciphertext);
@@ -115,11 +116,20 @@ static int valid(char *ciphertext, struct fmt_main *self)
 		goto err;
 	if ((p = strtok(NULL, "$")) == NULL)	/* algorithm */
 		goto err;
-	if (strncmp(p, "pbkdf2_sha256", 13) != 0)
+	if (strcmp(p, "pbkdf2_sha256") != 0)
 		goto err;
 	if ((p = strtok(NULL, "$")) == NULL)	/* iterations */
 		goto err;
-	if ((p = strtok(NULL, "$")) == NULL)	/* hash */
+	if (strlen(p) > 10) // FIXME: strlen 10 still allows undefined behavior in atoi!
+		goto err;
+	iterations=atoi(p);
+	if (iterations <= 0 || iterations >= INT_MAX ) // FIXME: atoi undefined behavior
+		goto err;
+	if ((p = strtok(NULL, "$")) == NULL)	/* salt */
+		goto err;
+	if (strlen(p) > (SALT_SIZE + 2) / 3 * 4)
+		goto err;
+	if ((p = strtok(NULL, "")) == NULL)	/* hash */
 		goto err;
 	if (strlen(p) > HASH_LENGTH)
 		goto err;

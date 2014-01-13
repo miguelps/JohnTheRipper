@@ -349,7 +349,7 @@ void listconf_parse_late(void)
 		do {
 			int ntests = 0;
 
-			if(format->params.tests) {
+			if (format->params.tests) {
 				while (format->params.tests[ntests++].ciphertext);
 				ntests--;
 			}
@@ -375,7 +375,7 @@ void listconf_parse_late(void)
 			        * ciphertext example will be silently truncated
 			        * to 256 characters here
 			        */
-			       format->params.tests ?
+			       ntests ?
 			       format->params.tests[0].ciphertext : "");
 		} while ((format = format->next));
 		exit(0);
@@ -386,7 +386,7 @@ void listconf_parse_late(void)
 		do {
 			int ntests = 0;
 
-			if(format->params.tests) {
+			if (format->params.tests) {
 				while (format->params.tests[ntests++].ciphertext);
 				ntests--;
 			}
@@ -410,7 +410,7 @@ void listconf_parse_late(void)
 #ifdef _OPENMP
 			printf(" Parallelized with OpenMP            %s\n", (format->params.flags & FMT_OMP) ? "yes" : "no");
 #endif
-			printf("Number of test cases for --test      %d\n", ntests);
+			printf("Number of test vectors               %d\n", ntests);
 			printf("Algorithm name                       %s\n", format->params.algorithm_name);
 			printf("Format name                          %s\n", format->params.format_name);
 			printf("Benchmark comment                    %s\n", format->params.benchmark_comment[0] == ' ' ? &format->params.benchmark_comment[1] : format->params.benchmark_comment);
@@ -428,6 +428,7 @@ void listconf_parse_late(void)
 			 * ciphertext example will be truncated to 512
 			 * characters here, with a notice.
 			 */
+			if (ntests)
 			printf("Example ciphertext%s  %.512s\n",
 			       strlen(format->params.tests[0].ciphertext) > 512
 			       ? " (truncated here)" : "                 ",
@@ -591,16 +592,21 @@ void listconf_parse_late(void)
 			 */
 			fmt_init(format);
 
-			if(format->params.tests) {
+			if (format->params.tests) {
 				while (format->params.tests[ntests].ciphertext) {
 					int i;
 					int skip = 0;
-					/* 
+					/*
 					 * defining a config variable ot allowing --field-separator-char=
 					 * with a fallback to either ':' or '\t' is probably overkill
 					 */
 					const char separator = '\t';
+					char *ciphertext;
 
+					ciphertext = format->params.tests[ntests].ciphertext;
+					if (ciphertext[ 0] == '\0')
+						ciphertext = format->methods.prepare(format->params.tests[ntests].fields,
+						                                     format);
 					/*
 					 * one of the scrypt tests has tabs and new lines in ciphertext
 					 * and password.
@@ -613,9 +619,9 @@ void listconf_parse_late(void)
 							        format->params.label, ntests);
 							break;
 						}
-					for (i = 0; format->params.tests[ntests].ciphertext[i]; i++) {
-						if (format->params.tests[ntests].ciphertext[i] == '\x0a' ||
-						    format->params.tests[ntests].ciphertext[i] == separator) {
+					for (i = 0; ciphertext[i]; i++) {
+						if (ciphertext[i] == '\x0a' ||
+						    ciphertext[i] == separator) {
 							skip = 2;
 							fprintf(stderr,
 							        "Test %s %d: ciphertext contains line feed or separator character '%c'\n",
@@ -628,8 +634,8 @@ void listconf_parse_late(void)
 					if (skip < 2) {
 						printf("%c%s",
 						       separator,
-						       format->params.tests[ntests].ciphertext);
-						if(!skip)
+						       ciphertext);
+						if (!skip)
 							printf("%c%s",
 							       separator,
 							       format->params.tests[ntests].plaintext);
@@ -638,6 +644,10 @@ void listconf_parse_late(void)
 					ntests++;
 				}
 			}
+			if (!ntests)
+				printf("%s lacks test vectors\n",
+				       format->params.label);
+
 			fmt_done(format);
 
 		} while ((format = format->next));
